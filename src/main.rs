@@ -1,5 +1,6 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
@@ -27,11 +28,35 @@ struct SnlArticle {
     xhtml_body: String,
 }
 
+struct Config {
+    sitemap: String,
+    output_path: String,
+    n: usize,
+}
+
+impl Config {
+    fn new(args: &[String]) -> Config {
+        let sitemap = args[1].clone();
+        let output_path = args[2].clone();
+        let n = match args[3].clone().parse() {
+            Ok(n) => n,
+            Err(error) => panic!("Failed to provide a digit for the n argument: {:?}", error),
+        };
+        Config {
+            sitemap,
+            output_path,
+            n,
+        }
+    }
+}
+
 fn main() {
     println!("SNL Parser!");
-    let sitemap_path = "data/sitemap.xml";
+    let args: Vec<String> = env::args().collect();
+    let config: Config = Config::new(&args);
+    let sitemap_path = config.sitemap;
 
-    let sitemap = match read_sitemap(sitemap_path) {
+    let sitemap = match read_sitemap(&sitemap_path) {
         Ok(file) => file,
         Err(error) => panic!("Problem opening the file: {:?}", error),
     };
@@ -47,7 +72,7 @@ fn main() {
     let json_suffix = ".json";
     let delay = time::Duration::from_millis(500);
     let mut c = 0;
-    let n = 10;
+    let n = config.n;
     for &url in urls.iter() {
         c = c + 1;
         if c > n {
@@ -75,7 +100,7 @@ fn main() {
         articles.push(article);
     }
     println!("Finished parsing JSON files... saving...");
-    let file = match File::create("snl_articles.json") {
+    let file = match File::create(config.output_path) {
         Ok(f) => f,
         Err(error) => panic!("Failed to create output file... {:?}", error),
     };
