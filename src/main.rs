@@ -21,10 +21,18 @@ fn get_urls(sitemap: &str) -> Result<Vec<&str>, Box<dyn Error>> {
     Ok(urls)
 }
 
+fn clean_html(html: &str) -> String {
+    let re = Regex::new(r"<[^<]+?>").unwrap();
+    let result = re.replace_all(html, "");
+    String::from(result)
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct SnlArticle {
-    title: String,
     id: usize,
+    url: String,
+    title: String,
+    subject_title: String,
     xhtml_body: String,
 }
 
@@ -69,7 +77,6 @@ fn main() {
     let number_of_urls: usize = urls.len();
     println!("Number of articles found on sitemap: {:?}", number_of_urls);
     let mut articles: Vec<SnlArticle> = vec![];
-    let json_suffix = ".json";
     let delay = time::Duration::from_millis(500);
     let mut c = 0;
     let n = config.n;
@@ -81,7 +88,7 @@ fn main() {
         println!("Parsing url: {}/{}", c, n);
         thread::sleep(delay);
 
-        let full_url = url.to_owned() + json_suffix;
+        let full_url = format!("{}.json", url);
         let response = match reqwest::blocking::get(&full_url) {
             Ok(data) => data,
             Err(err) => {
@@ -99,6 +106,11 @@ fn main() {
         };
         articles.push(article);
     }
+
+    for article in &mut articles {
+        article.xhtml_body = clean_html(&article.xhtml_body);
+    }
+
     println!("Finished parsing JSON files... saving...");
     let file = match File::create(config.output_path) {
         Ok(f) => f,
